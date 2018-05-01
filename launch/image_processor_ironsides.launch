@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <launch>
 
-  <arg name="robot" default="fla"/>
+  <arg name="robot" default="thorvald"/>
   <arg name="calibration_file"
-    default="$(find msckf_vio)/config/camchain-imucam-fla.yaml"/>
+    default="$(find msckf_vio)/config/ironsides.yaml"/>
 
   <!-- Image Processor Nodelet  -->
   <group ns="$(arg robot)">
@@ -14,8 +14,8 @@
       <rosparam command="load" file="$(arg calibration_file)"/>
       <param name="grid_row" value="4"/>
       <param name="grid_col" value="5"/>
-      <param name="grid_min_feature_num" value="2"/>
-      <param name="grid_max_feature_num" value="3"/>
+      <param name="grid_min_feature_num" value="3"/>
+      <param name="grid_max_feature_num" value="4"/>
       <param name="pyramid_levels" value="3"/>
       <param name="patch_size" value="15"/>
       <param name="fast_threshold" value="10"/>
@@ -24,9 +24,9 @@
       <param name="ransac_threshold" value="3"/>
       <param name="stereo_threshold" value="5"/>
 
-      <remap from="~imu" to="sync/imu/imu"/>
-      <remap from="~cam0_image" to="sync/cam0/image_raw"/>
-      <remap from="~cam1_image" to="sync/cam1/image_raw"/>
+      <remap from="~imu" to="/imu0"/>
+      <remap from="~cam0_image" to="/cam0_raw"/>
+      <remap from="~cam1_image" to="/cam1_raw"/>
 
     </node>
   </group>

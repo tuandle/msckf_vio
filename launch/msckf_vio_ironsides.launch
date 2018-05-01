@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <launch>
 
-  <arg name="robot" default="fla"/>
-  <arg name="fixed_frame_id" default="vision"/>
+  <arg name="robot" default="thorvald"/>
+  <arg name="fixed_frame_id" default="world"/>
   <arg name="calibration_file"
-    default="$(find msckf_vio)/config/camchain-imucam-fla.yaml"/>
+    default="$(find msckf_vio)/config/ironsides.yaml"/>
 
   <!-- Image Processor Nodelet  -->
-  <include file="$(find msckf_vio)/launch/image_processor_fla.launch">
+  <include file="$(find msckf_vio)/launch/image_processor_euroc.launch">
     <arg name="robot" value="$(arg robot)"/>
     <arg name="calibration_file" value="$(arg calibration_file)"/>
   </include>
@@ -22,7 +22,7 @@
       <rosparam command="load" file="$(arg calibration_file)"/>
 
       <param name="publish_tf" value="true"/>
-      <param name="frame_rate" value="40"/>
+      <param name="frame_rate" value="20"/>
       <param name="fixed_frame_id" value="$(arg fixed_frame_id)"/>
       <param name="child_frame_id" value="odom"/>
       <param name="max_cam_state_size" value="20"/>
@@ -36,11 +36,11 @@
       <param name="feature/config/translation_threshold" value="-1.0"/>
 
       <!-- These values should be standard deviation -->
-      <param name="noise/gyro" value="0.01"/>
-      <param name="noise/acc" value="0.1"/>
-      <param name="noise/gyro_bias" value="0.005"/>
-      <param name="noise/acc_bias" value="0.05"/>
-      <param name="noise/feature" value="0.03"/>
+      <param name="noise/gyro" value="1.1186830841306218e-03"/>
+      <param name="noise/acc" value="0.027052931930236323"/>
+      <param name="noise/gyro_bias" value="8.997530210630026e-06"/>
+      <param name="noise/acc_bias" value="1.3054568211204843e-03 "/>
+      <param name="noise/feature" value="0.035"/>
 
       <param name="initial_state/velocity/x" value="0.0"/>
       <param name="initial_state/velocity/y" value="0.0"/>
@@ -48,15 +48,15 @@
 
       <!-- These values should be covariance -->
       <param name="initial_covariance/velocity" value="0.25"/>
-      <param name="initial_covariance/gyro_bias" value="0.0001"/>
+      <param name="initial_covariance/gyro_bias" value="0.01"/>
       <param name="initial_covariance/acc_bias" value="0.01"/>
       <param name="initial_covariance/extrinsic_rotation_cov" value="3.0462e-4"/>
       <param name="initial_covariance/extrinsic_translation_cov" value="2.5e-5"/>
 
-      <remap from="~imu" to="sync/imu/imu"/>
+      <remap from="~imu" to="/imu0"/>
       <remap from="~features" to="image_processor/features"/>
 
     </node>
   </group>
-
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find msckf_vio)/rviz/rviz_fla_config.rviz" output="screen" />
 </launch>

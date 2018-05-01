@@ -46,6 +46,15 @@ bool ImageProcessor::loadParameters() {
       cam0_distortion_model, string("radtan"));
   nh.param<string>("cam1/distortion_model",
       cam1_distortion_model, string("radtan"));
+  nh.param<string>("cam0/camera_model",
+      cam0_camera_model, string("fisheye"));
+  nh.param<string>("cam1/camera_model",
+      cam1_camera_model, string("fisheye"));
+
+  /*std::string cam0_camera_model;
+  nh.getParam("cam0/camera_model", cam0_camera_model);
+  std::string cam1_camera_model;
+  nh.getParam("cam1/camera_model", cam1_camera_model);*/
 
   vector<int> cam0_resolution_temp(2);
   nh.getParam("cam0/resolution", cam0_resolution_temp);
@@ -57,19 +66,23 @@ bool ImageProcessor::loadParameters() {
   cam1_resolution[0] = cam1_resolution_temp[0];
   cam1_resolution[1] = cam1_resolution_temp[1];
 
-  vector<double> cam0_intrinsics_temp(4);
+  vector<double> cam0_intrinsics_temp(6);
   nh.getParam("cam0/intrinsics", cam0_intrinsics_temp);
   cam0_intrinsics[0] = cam0_intrinsics_temp[0];
   cam0_intrinsics[1] = cam0_intrinsics_temp[1];
   cam0_intrinsics[2] = cam0_intrinsics_temp[2];
   cam0_intrinsics[3] = cam0_intrinsics_temp[3];
+  cam0_intrinsics[4] = cam0_intrinsics_temp[4]; /*Xi coefficient for catadioptric/fiseye lens*/
+  cam0_intrinsics[5] = cam0_intrinsics_temp[5]; /*Eta coefficient for catadioptric lens*/
 
-  vector<double> cam1_intrinsics_temp(4);
+  vector<double> cam1_intrinsics_temp(5);
   nh.getParam("cam1/intrinsics", cam1_intrinsics_temp);
   cam1_intrinsics[0] = cam1_intrinsics_temp[0];
   cam1_intrinsics[1] = cam1_intrinsics_temp[1];
   cam1_intrinsics[2] = cam1_intrinsics_temp[2];
   cam1_intrinsics[3] = cam1_intrinsics_temp[3];
+  cam1_intrinsics[4] = cam1_intrinsics_temp[4]; /*Xi coefficient for catadioptric/fiseye lens*/
+  cam1_intrinsics[5] = cam1_intrinsics_temp[5]; /*Eta coefficient for catadioptric lens*/
 
   vector<double> cam0_distortion_coeffs_temp(4);
   nh.getParam("cam0/distortion_coeffs",
@@ -130,6 +143,8 @@ bool ImageProcessor::loadParameters() {
       cam0_intrinsics[2], cam0_intrinsics[3]);
   ROS_INFO("cam0_distortion_model: %s",
       cam0_distortion_model.c_str());
+  ROS_INFO("cam0_camera_model: %s",
+      cam0_camera_model.c_str());
   ROS_INFO("cam0_distortion_coefficients: %f, %f, %f, %f",
       cam0_distortion_coeffs[0], cam0_distortion_coeffs[1],
       cam0_distortion_coeffs[2], cam0_distortion_coeffs[3]);
@@ -141,6 +156,8 @@ bool ImageProcessor::loadParameters() {
       cam1_intrinsics[2], cam1_intrinsics[3]);
   ROS_INFO("cam1_distortion_model: %s",
       cam1_distortion_model.c_str());
+  ROS_INFO("cam1_camera_model: %s",
+      cam1_camera_model.c_str());
   ROS_INFO("cam1_distortion_coefficients: %f, %f, %f, %f",
       cam1_distortion_coeffs[0], cam1_distortion_coeffs[1],
       cam1_distortion_coeffs[2], cam1_distortion_coeffs[3]);
@@ -387,7 +404,7 @@ void ImageProcessor::initializeFirstFrame() {
 void ImageProcessor::predictFeatureTracking(
     const vector<cv::Point2f>& input_pts,
     const cv::Matx33f& R_p_c,
-    const cv::Vec4d& intrinsics,
+    const cv::Vec6d& intrinsics,
     vector<cv::Point2f>& compensated_pts) {
 
   // Return directly if there are no input features.
@@ -549,13 +566,13 @@ void ImageProcessor::trackFeatures() {
   // Step 2 and 3: RANSAC on temporal image pairs of cam0 and cam1.
   vector<int> cam0_ransac_inliers(0);
   twoPointRansac(prev_matched_cam0_points, curr_matched_cam0_points,
-      cam0_R_p_c, cam0_intrinsics, cam0_distortion_model,
+      cam0_R_p_c, cam0_intrinsics, cam0_distortion_model,cam0_camera_model,
       cam0_distortion_coeffs, processor_config.ransac_threshold,
       0.99, cam0_ransac_inliers);
 
   vector<int> cam1_ransac_inliers(0);
   twoPointRansac(prev_matched_cam1_points, curr_matched_cam1_points,
-      cam1_R_p_c, cam1_intrinsics, cam1_distortion_model,
+      cam1_R_p_c, cam1_intrinsics, cam1_distortion_model,cam1_camera_model,
       cam1_distortion_coeffs, processor_config.ransac_threshold,
       0.99, cam1_ransac_inliers);
 
@@ -618,11 +635,15 @@ void ImageProcessor::stereoMatch(
     // rotation from stereo extrinsics
     const cv::Matx33d R_cam0_cam1 = R_cam1_imu.t() * R_cam0_imu;
     vector<cv::Point2f> cam0_points_undistorted;
-    undistortPoints(cam0_points, cam0_intrinsics, cam0_distortion_model,
-                    cam0_distortion_coeffs, cam0_points_undistorted,
-                    R_cam0_cam1);
+    /*undistortPoints(cam0_points,cam0_intrinsics,
+                    cam0_distortion_model,cam0_camera_model,
+                    cam0_distortion_coeffs,cam0_points_undistorted,R_cam0_cam1);*/
+    undistortPoints(cam0_points,cam0_intrinsics,cam0_distortion_model,
+                    cam0_camera_model,cam0_distortion_coeffs,
+                    cam0_points_undistorted,R_cam0_cam1);
     cam1_points = distortPoints(cam0_points_undistorted, cam1_intrinsics,
-                                cam1_distortion_model, cam1_distortion_coeffs);
+                                cam1_distortion_model, cam1_camera_model,
+                                cam1_distortion_coeffs);
   }
 
   // Track features using LK optical flow method.
@@ -664,10 +685,10 @@ void ImageProcessor::stereoMatch(
   vector<cv::Point2f> cam1_points_undistorted(0);
   undistortPoints(
       cam0_points, cam0_intrinsics, cam0_distortion_model,
-      cam0_distortion_coeffs, cam0_points_undistorted);
+      cam0_camera_model,cam0_distortion_coeffs, cam0_points_undistorted);
   undistortPoints(
       cam1_points, cam1_intrinsics, cam1_distortion_model,
-      cam1_distortion_coeffs, cam1_points_undistorted);
+      cam1_camera_model,cam1_distortion_coeffs, cam1_points_undistorted);
 
   double norm_pixel_unit = 4.0 / (
       cam0_intrinsics[0]+cam0_intrinsics[1]+
@@ -849,8 +870,9 @@ void ImageProcessor::pruneGridFeatures() {
 
 void ImageProcessor::undistortPoints(
     const vector<cv::Point2f>& pts_in,
-    const cv::Vec4d& intrinsics,
+    const cv::Vec6d& intrinsics,
     const string& distortion_model,
+    const string& camera_model,
     const cv::Vec4d& distortion_coeffs,
     vector<cv::Point2f>& pts_out,
     const cv::Matx33d &rectification_matrix,
@@ -862,21 +884,28 @@ void ImageProcessor::undistortPoints(
       intrinsics[0], 0.0, intrinsics[2],
       0.0, intrinsics[1], intrinsics[3],
       0.0, 0.0, 1.0);
-
+  const double xi = intrinsics[4];
+  const double eta = intrinsics[5];
   const cv::Matx33d K_new(
       new_intrinsics[0], 0.0, new_intrinsics[2],
       0.0, new_intrinsics[1], new_intrinsics[3],
       0.0, 0.0, 1.0);
 
-  if (distortion_model == "radtan") {
-    cv::undistortPoints(pts_in, pts_out, K, distortion_coeffs,
-                        rectification_matrix, K_new);
-  } else if (distortion_model == "equidistant") {
-    cv::fisheye::undistortPoints(pts_in, pts_out, K, distortion_coeffs,
-                                 rectification_matrix, K_new);
+  ROS_INFO_ONCE("The camera model is %s ",camera_model.c_str());
+  ROS_INFO_ONCE("The distortion model is %s ",distortion_model.c_str());
+  if (camera_model == "pinhole") {
+    if (distortion_model == "radtan")
+      cv::undistortPoints(pts_in, pts_out, K, distortion_coeffs,
+                              rectification_matrix, K_new);
+    else if (distortion_model == "equidistant")
+      cv::fisheye::undistortPoints(pts_in, pts_out, K, distortion_coeffs,
+                                 rectification_matrix, K_new);  
+  } else if (camera_model == "omni") {
+    cv::omnidir::undistortPoints(pts_in,pts_out,K,distortion_coeffs,
+                                 xi,rectification_matrix);
   } else {
-    ROS_WARN_ONCE("The model %s is unrecognized, use radtan instead...",
-                  distortion_model.c_str());
+    ROS_WARN_ONCE("The camera model %s and distortion model %s is unrecognized, use pinhole and radtan to undistort instead...",
+                  camera_model.c_str(),distortion_model.c_str());
     cv::undistortPoints(pts_in, pts_out, K, distortion_coeffs,
                         rectification_matrix, K_new);
   }
@@ -886,8 +915,9 @@ void ImageProcessor::undistortPoints(
 
 vector<cv::Point2f> ImageProcessor::distortPoints(
     const vector<cv::Point2f>& pts_in,
-    const cv::Vec4d& intrinsics,
+    const cv::Vec6d& intrinsics,
     const string& distortion_model,
+    const string& camera_model,
     const cv::Vec4d& distortion_coeffs) {
 
   const cv::Matx33d K(intrinsics[0], 0.0, intrinsics[2],
@@ -895,16 +925,19 @@ vector<cv::Point2f> ImageProcessor::distortPoints(
                       0.0, 0.0, 1.0);
 
   vector<cv::Point2f> pts_out;
-  if (distortion_model == "radtan") {
-    vector<cv::Point3f> homogenous_pts;
-    cv::convertPointsToHomogeneous(pts_in, homogenous_pts);
-    cv::projectPoints(homogenous_pts, cv::Vec3d::zeros(), cv::Vec3d::zeros(), K,
+  if (camera_model == "pinhole") {
+    if (distortion_model == "radtan") {
+      vector<cv::Point3f> homogenous_pts;
+      cv::convertPointsToHomogeneous(pts_in, homogenous_pts);
+      cv::projectPoints(homogenous_pts, cv::Vec3d::zeros(), cv::Vec3d::zeros(), K,
                       distortion_coeffs, pts_out);
-  } else if (distortion_model == "equidistant") {
-    cv::fisheye::distortPoints(pts_in, pts_out, K, distortion_coeffs);
+    }
+    else if (distortion_model == "equidistant") cv::fisheye::distortPoints(pts_in, pts_out, K, distortion_coeffs);                    
+  } else if (camera_model == "omni") {    
+    cv::fisheye::distortPoints(pts_in, pts_out, K, distortion_coeffs); //TODO: currently, there is no function for omni cameras 
   } else {
-    ROS_WARN_ONCE("The model %s is unrecognized, using radtan instead...",
-                  distortion_model.c_str());
+    ROS_WARN_ONCE("The camera model %s and distortion model %s is unrecognized, use pinhole and radtan to distort instead...",
+                  camera_model.c_str(),distortion_model.c_str());
     vector<cv::Point3f> homogenous_pts;
     cv::convertPointsToHomogeneous(pts_in, homogenous_pts);
     cv::projectPoints(homogenous_pts, cv::Vec3d::zeros(), cv::Vec3d::zeros(), K,
@@ -986,8 +1019,9 @@ void ImageProcessor::rescalePoints(
 
 void ImageProcessor::twoPointRansac(
     const vector<Point2f>& pts1, const vector<Point2f>& pts2,
-    const cv::Matx33f& R_p_c, const cv::Vec4d& intrinsics,
+    const cv::Matx33f& R_p_c, const cv::Vec6d& intrinsics,
     const std::string& distortion_model,
+    const std::string& camera_model,
     const cv::Vec4d& distortion_coeffs,
     const double& inlier_error,
     const double& success_probability,
@@ -1011,10 +1045,10 @@ void ImageProcessor::twoPointRansac(
   vector<Point2f> pts2_undistorted(pts2.size());
   undistortPoints(
       pts1, intrinsics, distortion_model,
-      distortion_coeffs, pts1_undistorted);
+      camera_model,distortion_coeffs, pts1_undistorted);
   undistortPoints(
       pts2, intrinsics, distortion_model,
-      distortion_coeffs, pts2_undistorted);
+      camera_model,distortion_coeffs, pts2_undistorted);
 
   // Compenstate the points in the previous image with
   // the relative rotation.
@@ -1248,10 +1282,12 @@ void ImageProcessor::publish() {
 
   undistortPoints(
       curr_cam0_points, cam0_intrinsics, cam0_distortion_model,
-      cam0_distortion_coeffs, curr_cam0_points_undistorted);
+      cam0_camera_model,cam0_distortion_coeffs, 
+      curr_cam0_points_undistorted);
   undistortPoints(
       curr_cam1_points, cam1_intrinsics, cam1_distortion_model,
-      cam1_distortion_coeffs, curr_cam1_points_undistorted);
+      cam1_camera_model,cam1_distortion_coeffs, 
+      curr_cam1_points_undistorted);
 
   for (int i = 0; i < curr_ids.size(); ++i) {
     feature_msg_ptr->features.push_back(FeatureMeasurement());

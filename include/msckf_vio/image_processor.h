@@ -13,6 +13,7 @@
 #include <boost/shared_ptr.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/video.hpp>
+#include <opencv2/ccalib/omnidir.hpp>
 
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
@@ -236,7 +237,7 @@ private:
   void predictFeatureTracking(
       const std::vector<cv::Point2f>& input_pts,
       const cv::Matx33f& R_p_c,
-      const cv::Vec4d& intrinsics,
+      const cv::Vec6d& intrinsics,
       std::vector<cv::Point2f>& compenstated_pts);
 
   /*
@@ -257,16 +258,18 @@ private:
       const std::vector<cv::Point2f>& pts1,
       const std::vector<cv::Point2f>& pts2,
       const cv::Matx33f& R_p_c,
-      const cv::Vec4d& intrinsics,
+      const cv::Vec6d& intrinsics,
       const std::string& distortion_model,
+      const std::string& camera_model,
       const cv::Vec4d& distortion_coeffs,
       const double& inlier_error,
       const double& success_probability,
       std::vector<int>& inlier_markers);
   void undistortPoints(
       const std::vector<cv::Point2f>& pts_in,
-      const cv::Vec4d& intrinsics,
+      const cv::Vec6d& intrinsics,
       const std::string& distortion_model,
+      const std::string& camera_model,
       const cv::Vec4d& distortion_coeffs,
       std::vector<cv::Point2f>& pts_out,
       const cv::Matx33d &rectification_matrix = cv::Matx33d::eye(),
@@ -277,8 +280,9 @@ private:
       float& scaling_factor);
   std::vector<cv::Point2f> distortPoints(
       const std::vector<cv::Point2f>& pts_in,
-      const cv::Vec4d& intrinsics,
+      const cv::Vec6d& intrinsics,
       const std::string& distortion_model,
+      const std::string& camera_model,
       const cv::Vec4d& distortion_coeffs);
 
   /*
@@ -333,13 +337,15 @@ private:
 
   // Camera calibration parameters
   std::string cam0_distortion_model;
+  std::string cam0_camera_model;
   cv::Vec2i cam0_resolution;
-  cv::Vec4d cam0_intrinsics;
+  cv::Vec6d cam0_intrinsics;
   cv::Vec4d cam0_distortion_coeffs;
 
   std::string cam1_distortion_model;
+  std::string cam1_camera_model;
   cv::Vec2i cam1_resolution;
-  cv::Vec4d cam1_intrinsics;
+  cv::Vec6d cam1_intrinsics;
   cv::Vec4d cam1_distortion_coeffs;
 
   // Take a vector from cam0 frame to the IMU frame.
